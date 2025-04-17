@@ -1,0 +1,30 @@
+<!-- templates/partials/_recommendations.html -->
+<div class="row justify-content-center mb-4">
+    <div class="col-md-10 col-lg-8">
+         <div class="card recommendation-card">
+             <div class="card-header">
+                 Bundle Suggestion (after viewing <strong>{{ last_viewed }}</strong>)
+             </div>
+            <div class="card-body justify-content-around">
+                 {% if enriched_bundle %}
+                     {% for item in enriched_bundle %}
+                         <div class="rec-item mb-2 mb-md-0">
+                             <h6 class="h6 small text-muted mb-2">{{ item.category_name }}</h6>
+                             {% for sample in item.samples %}
+                                 {# Display Emoji instead of Image #}
+                                 <div class="emoji-display mb-2" style="font-size: 4rem; line-height: 1;"> {# Larger emoji #}
+                                     {{ sample.emoji }}
+                                 </div>
+                                 <p class="small mb-0" title="{{ sample.name }}">
+                                     {{ sample.name[:30] }}{% if sample.name|length > 30 %}...{% endif %}
+                                 </p>
+                             {% endfor %}
+                         </div>
+                     {% endfor %}
+                 {% else %}
+                     <p class="text-muted m-auto">We couldn't find a specific bundle suggestion right now.</p>
+                 {% endif %}
+            </div>
+         </div>
+     </div>
+ </div>

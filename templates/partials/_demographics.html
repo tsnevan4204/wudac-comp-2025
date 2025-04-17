@@ -1,0 +1,43 @@
+<div class="row justify-content-center mb-4">
+    <div class="col-md-10 col-lg-8">
+        <div class="demographics-box p-4">
+            <h2 class="h5 mb-3">Your Demographics Profile</h2>
+            {% if demographics.income %}
+                <p class="mb-1">Income Level: <strong>{{ income_levels.get(demographics.income, 'N/A') }}</strong></p>
+                <p class="mb-2">Children Present: <strong>{{ children_options.get(demographics.children, 'N/A') }}</strong></p>
+                {% if proxy_user_id %}
+                    <p class="text-muted small mb-2">(Simulating recommendations for a similar user: {{ proxy_user_id }})</p>
+                {% endif %}
+                <a href="{{ url_for('clear_session') }}" class="btn btn-sm btn-outline-secondary mt-2">Change Demographics</a>
+            {% else %}
+                <p>Select your demographics for personalized bundle suggestions:</p>
+                <form action="{{ url_for('index') }}" method="POST">
+                    <div class="row g-2 align-items-end"> {# Use align-items-end for button alignment #}
+                        <div class="col-md">
+                            <label for="income" class="form-label visually-hidden">Income Level:</label>
+                            <select name="income" id="income" class="form-select form-select-sm" required>
+                                <option value="" selected disabled>-- Select Income --</option>
+                                {% for code, desc in income_levels.items() %}
+                                  {% if code != '99' %} {# Exclude Unknown from selection #}
+                                    <option value="{{ code }}">{{ desc }}</option>
+                                  {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md">
+                            <label for="children" class="form-label visually-hidden">Children Present:</label>
+                            <select name="children" id="children" class="form-select form-select-sm" required>
+                                 <option value="" selected disabled>-- Children --</option>
+                                 <option value="0">No</option>
+                                 <option value="1">Yes</option>
+                             </select>
+                        </div>
+                        <div class="col-md-auto">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">Save</button>
+                        </div>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
