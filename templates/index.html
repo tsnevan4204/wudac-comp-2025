@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulated Store</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <style>
+        body { padding-top: 20px; background-color: #f8f9fa; }
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .product-item {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            text-align: center;
+            background-color: #fff;
+            transition: box-shadow 0.2s ease-in-out;
+        }
+        .product-item:hover {
+             box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        }
+        .product-item a {
+            text-decoration: none;
+            color: #212529;
+            font-weight: 500;
+        }
+         .product-item a:hover {
+             color: #0d6efd;
+         }
+        .recommendation-card {
+            border: 1px solid #b3d7ff;
+            background-color: #e7f3ff;
+        }
+        .recommendation-card .card-body {
+            display: flex;
+            gap: 1rem;
+            align-items: center; /* Vertically align items */
+        }
+        .recommendation-card img {
+            max-width: 80px; /* Smaller images for bundle */
+            height: auto;
+            border-radius: 0.25rem;
+        }
+        .demographics-box {
+             background-color: #fff;
+             border: 1px solid #dee2e6;
+             border-radius: 0.375rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Welcome to the Simulated Store!</h1>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="row justify-content-center mb-3">
+              <div class="col-md-8">
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <!-- Demographics Section -->
+        <div class="row justify-content-center mb-4">
+            <div class="col-md-8">
+                <div class="demographics-box p-4">
+                    <h2 class="h5 mb-3">Your Demographics Profile</h2>
+                    {% if demographics.income %}
+                        <p class="mb-1">
+                            Income Level: <strong>{{ income_levels.get(demographics.income, 'N/A') }}</strong>
+                        </p>
+                        <p class="mb-2">
+                             Children Present: <strong>{{ children_options.get(demographics.children, 'N/A') }}</strong>
+                        </p>
+                        {% if proxy_user_id %}
+                            <p class="text-muted small mb-2">(Simulating recommendations for a similar user: {{ proxy_user_id }})</p>
+                        {% endif %}
+                        <a href="{{ url_for('clear_session') }}" class="btn btn-sm btn-outline-secondary">Change Demographics</a>
+                    {% else %}
+                        <p>Select your demographics to get personalized bundle suggestions:</p>
+                        <form action="{{ url_for('index') }}" method="POST">
+                            <div class="mb-2">
+                                <label for="income" class="form-label">Income Level:</label>
+                                <select name="income" id="income" class="form-select form-select-sm" required>
+                                    <option value="" selected disabled>-- Select Income --</option>
+                                    {% for code, desc in income_levels.items() %}
+                                      {% if code != '99' %}
+                                        <option value="{{ code }}">{{ desc }}</option>
+                                      {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="children" class="form-label">Children Present:</label>
+                                <select name="children" id="children" class="form-select form-select-sm" required>
+                                     <option value="" selected disabled>-- Select --</option>
+                                     <option value="0">No</option>
+                                     <option value="1">Yes</option>
+                                 </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Save Demographics</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Recommendation Section -->
+        {% if last_viewed and enriched_bundle is not none %}
+        <div class="row justify-content-center mb-4">
+            <div class="col-md-10">
+                 <div class="card recommendation-card">
+                     <div class="card-header">
+                         Bundle Suggestion (after viewing <strong>{{ last_viewed }}</strong>)
+                     </div>
+                    <div class="card-body">
+                         {% if enriched_bundle %}
+                             <p class="me-3">You might also like:</p>
+                             <div class="d-flex flex-grow-1 justify-content-around">
+                                 {% for item in enriched_bundle %}
+                                     <div class="text-center">
+                                         <h6 class="h6 small text-muted">{{ item.category_name }}</h6>
+                                         {% for sample in item.samples %}
+                                             <img src="{{ sample.img }}" alt="{{ sample.name }}" class="mb-1">
+                                             <p class="small mb-0">{{ sample.name }}</p>
+                                         {% endfor %}
+                                     </div>
+                                 {% endfor %}
+                             </div>
+                         {% else %}
+                             <p class="text-muted">We couldn't find a specific bundle suggestion right now.</p>
+                         {% endif %}
+                    </div>
+                 </div>
+             </div>
+         </div>
+        {% endif %}
+
+
+        <!-- Products Section -->
+        <div class="products mb-5">
+            <h2 class="h4 mb-3">Browse Products (Categories)</h2>
+             {% if not demographics.income %}
+                 <p class="text-muted small">Set your demographics above to enable bundle suggestions when you click a product.</p>
+             {% endif %}
+            <div class="product-grid">
+                {% for product in products %}
+                <div class="product-item">
+                    <a href="{{ url_for('view_product', product_name=product) }}">{{ product }}</a>
+                </div>
+                {% else %}
+                 <p class="text-danger">No products loaded. Ensure model and data files exist and train_and_save.py ran successfully.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle (needed for dropdowns, alerts etc.) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+</body>
+</html>
