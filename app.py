@@ -175,10 +175,16 @@ def recommend_bundle_approach2_webapp(
     user_id, seed_product, model, cooc_matrix,
     user_map, item_map, item_map_reverse,
     top_n_candidates=50,
-    w_recs=0.5, w_cooc_pair=0.3, w_cooc_seed=0.2, # Default weights favoring personalization
+    # --- ADJUSTED DEFAULT WEIGHTS ---
+    w_recs=0.3,       # DECREASED personalization slightly
+    w_cooc_pair=0.2,  # DECREASED weight for pair relationship
+    w_cooc_seed=0.5,  # INCREASED weight for relationship with seed product
+    # --------------------------------
     filter_categories=None
     ):
-    """Recommends a 2-product bundle using SVD + Co-occurrence Heuristics."""
+    """
+    Recommends a 2-product bundle - Weights adjusted to prioritize seed product co-occurrence.
+    """
     if not model: return [], "Model not loaded."
     if filter_categories is None: filter_categories = []
 
@@ -186,8 +192,10 @@ def recommend_bundle_approach2_webapp(
     if seed_product not in item_map: return [], f"Seed product '{seed_product}' not found."
 
     inner_user_id = user_map[user_id]; inner_seed_id = item_map[seed_product]
+    # Print statement includes weights now for easier debugging
     print(f"Reco: U={user_id}({inner_user_id}), S='{seed_product}'({inner_seed_id}), Filter={filter_categories}, W={w_recs},{w_cooc_pair},{w_cooc_seed}")
 
+    # 1. Generate Top-N Candidates (Filter first)
     all_item_inner_ids = list(item_map_reverse.keys()); predictions = []
     for inner_item_id in all_item_inner_ids:
         raw_iid = item_map_reverse.get(inner_item_id)
@@ -201,23 +209,42 @@ def recommend_bundle_approach2_webapp(
     if len(top_n_items) < 2: return [], "Not enough eligible recommendations."
     print(f"Generated {len(top_n_items)} eligible candidates.")
 
+    # 2. Generate Candidate Pairs and Score Them
     candidate_pairs = list(combinations(top_n_items, 2)); scored_pairs = []
     print(f"Scoring {len(candidate_pairs)} candidate pairs...")
     for (item_i_info, item_j_info) in candidate_pairs:
         inner_item_i_id, score_i = item_i_info; inner_item_j_id, score_j = item_j_info
         item_i_name = item_map_reverse.get(inner_item_i_id); item_j_name = item_map_reverse.get(inner_item_j_id)
         if not item_i_name or not item_j_name: continue
+
         cooc_ij = cooc_matrix.get(item_i_name, {}).get(item_j_name, 0)
         cooc_seed_i = cooc_matrix.get(seed_product, {}).get(item_i_name, 0)
         cooc_seed_j = cooc_matrix.get(seed_product, {}).get(item_j_name, 0)
-        final_score = (w_recs * (score_i + score_j) / 2 + w_cooc_pair * cooc_ij + w_cooc_seed * (cooc_seed_i + cooc_seed_j) / 2)
+
+        # --- Heuristic Scoring Formula (Using adjusted weights) ---
+        final_score = (w_recs * (score_i + score_j) / 2 +
+                       w_cooc_pair * cooc_ij +
+                       w_cooc_seed * (cooc_seed_i + cooc_seed_j) / 2) # Still averaging seed cooc
+
+        # --- ALTERNATIVE FORMULA (Option 2 - if simple weight change isn't enough) ---
+        # Give weight to MINIMUM cooc with seed, maybe? Or multiply? Requires more thought.
+        # Example: Emphasize that BOTH items relate to the seed
+        # min_cooc_seed = min(cooc_seed_i, cooc_seed_j)
+        # avg_cooc_seed = (cooc_seed_i + cooc_seed_j) / 2
+        # final_score = (w_recs * (score_i + score_j) / 2 +
+        #                w_cooc_pair * cooc_ij +
+        #                w_cooc_seed * avg_cooc_seed + # Weight average connection
+        #                w_min_cooc_seed * min_cooc_seed) # Add another weight/term
+        # Requires adding w_min_cooc_seed parameter and tuning 4 weights. Let's stick to 3 weights first.
+        # -----------------------------------------------------------------------------
+
         scored_pairs.append(((item_i_name, item_j_name), final_score))
 
     if not scored_pairs: return [], "No valid pairs scored."
-    scored_pairs.sort(key=lambda x: random.random())
+    scored_pairs.sort(key=lambda x: x[1], reverse=True)
     print(f"Top 5 pairs: {[(pair[0], f'{pair[1]:.4f}') for pair in scored_pairs[:5]]}")
-    best_pair = list(scored_pairs[0][0]); 
-    return best_pair, None
+    best_pair = list(scored_pairs[0][0]); return best_pair, None
+
 
 
 # --- Flask Routes ---
@@ -277,12 +304,11 @@ def view_product(product_name):
     session['proxy_user_id'] = proxy_user_id
 
     # Keep filter list and recommendation call
-    categories_to_filter = ["Beauty", "Home Improvement", "Clothing"] # Adjust
     print(f"Requesting bundle for User {proxy_user_id}, Seed: {product_name}")
     recommended_categories, error_msg = recommend_bundle_approach2_webapp(
         user_id=proxy_user_id, seed_product=product_name, model=svd_model,
         cooc_matrix=cooc_matrix, user_map=user_map, item_map=item_map,
-        item_map_reverse=item_map_reverse, filter_categories=categories_to_filter
+        item_map_reverse=item_map_reverse, filter_categories=[]
     )
 
     session['last_viewed'] = product_name
